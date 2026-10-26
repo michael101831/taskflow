@@ -20,16 +20,26 @@ export class CallSession {
   private pendingCandidates = new Map<string, RTCIceCandidateInit[]>()
   private roster: CallPeer[] = []
   private stopped = false
+  private stream: MediaStream
+  private listeners: {
+    onPeers: (peers: CallPeer[]) => void
+    onOpen: () => void
+    onError: (message: string) => void
+    onClose: () => void
+  }
 
   constructor(
-    private stream: MediaStream,
-    private listeners: {
+    stream: MediaStream,
+    listeners: {
       onPeers: (peers: CallPeer[]) => void
       onOpen: () => void
       onError: (message: string) => void
       onClose: () => void
     },
-  ) {}
+  ) {
+    this.stream = stream
+    this.listeners = listeners
+  }
 
   connect(url: string, token: string, roomId: string) {
     const socket = new WebSocket(url)
