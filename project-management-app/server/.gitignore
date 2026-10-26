@@ -1,0 +1,11 @@
+node_modules
+# Keep environment variables out of version control
+.env
+
+/src/generated/prisma
+
+# Prisma CLI skill bundles are not part of this application
+.agents/
+.claude/
+.windsurf/
+skills-lock.json

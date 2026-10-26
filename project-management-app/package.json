@@ -1,0 +1,23 @@
+{
+  "name": "project-management-app",
+  "private": true,
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "dev": "concurrently -n client,server -c cyan,green \"npm run dev --workspace client\" \"npm run dev --workspace server\"",
+    "dev:full": "concurrently -n auth,client,server -c yellow,cyan,green \"firebase emulators:start --only auth --project demo-taskflow\" \"npm run dev --workspace client\" \"npm run dev --workspace server\"",
+    "auth:emulator": "firebase emulators:start --only auth --project demo-taskflow",
+    "build": "npm run build --workspace client && npm run build --workspace server",
+    "lint": "npm run lint --workspace client && npm run typecheck --workspace server",
+    "test": "npm run test --workspace client && npm run test --workspace server",
+    "db:generate": "npm run db:generate --workspace server",
+    "db:migrate": "npm run db:migrate --workspace server",
+    "db:seed": "npm run db:seed --workspace server",
+    "db:studio": "npm run db:studio --workspace server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
