@@ -170,11 +170,12 @@ export async function createConversation(input: {
   }
 
   if (input.kind === 'direct') {
-    if (others.length !== 1) {
+    const coworkerId = others[0]
+    if (others.length !== 1 || !coworkerId) {
       return { error: 'A direct message needs one coworker' as const }
     }
 
-    const directKey = [input.creatorId, others[0]].sort().join(':')
+    const directKey = [input.creatorId, coworkerId].sort().join(':')
     const existing = await prisma.conversation.findUnique({
       where: {
         projectId_directKey: { projectId: input.projectId, directKey },
@@ -190,7 +191,7 @@ export async function createConversation(input: {
         kind: ConversationKind.DIRECT,
         directKey,
         members: {
-          create: [input.creatorId, others[0]].map((userId) => ({ userId })),
+          create: [input.creatorId, coworkerId].map((userId) => ({ userId })),
         },
       },
       include: conversationInclude,
