@@ -612,14 +612,14 @@ function App() {
         <a
           className="brand"
           href="/"
-          aria-label="TaskFlow home"
+          aria-label="Parallel home"
           onClick={(event) => {
             event.preventDefault()
             setSection('home')
           }}
         >
           <span className="brand__mark">T</span>
-          TaskFlow
+          Parallel
         </a>
 
         <div className="project-switcher">

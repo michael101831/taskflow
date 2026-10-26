@@ -101,7 +101,7 @@ export function AuthPage() {
       <section className="auth-card">
         <div className="auth-brand">
           <span className="brand__mark">T</span>
-          <span>TaskFlow</span>
+          <span>Parallel</span>
         </div>
 
         <div>

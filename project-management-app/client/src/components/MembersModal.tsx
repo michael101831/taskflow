@@ -156,7 +156,7 @@ export function MembersModal({
 
             <form className="member-form" onSubmit={(event) => void handleSubmit(event)}>
               <label>
-                Add an existing TaskFlow user
+                Add an existing Parallel user
                 <input
                   required
                   type="email"

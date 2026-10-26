@@ -287,7 +287,7 @@ projectsRouter.post(
 
       if (!user) {
         response.status(404).json({
-          message: 'That user must sign in to TaskFlow before being added',
+          message: 'That user must sign in to Parallel before being added',
         })
         return
       }

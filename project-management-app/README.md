@@ -1,4 +1,4 @@
-# TaskFlow
+# Parallel
 
 A portfolio-ready project management application built with React, TypeScript,
 Node.js, Express, PostgreSQL, and Prisma.
@@ -70,7 +70,7 @@ project-management-app/
 1. Firebase signs the user in and issues an ID token.
 2. Express verifies the token and synchronizes the user with PostgreSQL.
 3. Project memberships determine which projects and tasks the user can access.
-4. Owners can create projects and add existing TaskFlow users by email.
+4. Owners can create projects and add existing Parallel users by email.
 5. Tasks can be assigned only to members of their project.
 6. React switches projects without reloading the page.
 7. Tasks can be dragged between status columns or moved with arrow buttons.
