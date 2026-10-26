@@ -137,17 +137,21 @@ function App() {
       setIsLoading(true)
 
       try {
-        const [savedTasks, savedMembers, savedRoles] = await Promise.all([
+        const [tasksResult, membersResult, rolesResult] = await Promise.allSettled([
           tasksApi.list(activeProjectId),
           projectsApi.listMembers(activeProjectId),
           projectsApi.listRoles(activeProjectId),
         ])
 
         if (isCurrent) {
-          setTasks(savedTasks)
-          setMembers(savedMembers)
-          setRoles(savedRoles)
-          setRequestError('')
+          setTasks(tasksResult.status === 'fulfilled' ? tasksResult.value : [])
+          setMembers(membersResult.status === 'fulfilled' ? membersResult.value : [])
+          setRoles(rolesResult.status === 'fulfilled' ? rolesResult.value : [])
+          setRequestError(
+            tasksResult.status === 'rejected'
+              ? 'The selected project could not be loaded.'
+              : '',
+          )
         }
       } catch {
         if (isCurrent) {
@@ -848,7 +852,7 @@ function App() {
           </p>
         )}
 
-        {section === 'home' && !requestError && projects.length > 0 && (
+        {section === 'home' && projects.length > 0 && (
           <HomePanel
             projects={visibleProjects}
             onOpenProject={openProject}

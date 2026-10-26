@@ -6,19 +6,21 @@ export function sortProjects(projects: Project[], sort: ProjectSort) {
   const sorted = [...projects]
 
   if (sort === 'recent') {
-    sorted.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+    sorted.sort((left, right) =>
+      (right.updatedAt ?? '').localeCompare(left.updatedAt ?? ''),
+    )
     return sorted
   }
 
   if (sort === 'bookmarked') {
     sorted.sort((left, right) => {
       if (left.bookmarked !== right.bookmarked) return left.bookmarked ? -1 : 1
-      return left.name.localeCompare(right.name)
+      return (left.name ?? '').localeCompare(right.name ?? '')
     })
     return sorted
   }
 
-  sorted.sort((left, right) => left.name.localeCompare(right.name))
+  sorted.sort((left, right) => (left.name ?? '').localeCompare(right.name ?? ''))
   return sorted
 }
 

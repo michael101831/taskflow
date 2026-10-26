@@ -1,5 +1,11 @@
-import type { Project } from '../types'
+import type { Project, TaskCounts } from '../types'
 import { columns } from '../data/columns'
+
+const emptyCounts: TaskCounts = { todo: 0, 'in-progress': 0, done: 0 }
+
+function countsFor(project: Project) {
+  return project.taskCounts ?? emptyCounts
+}
 
 interface HomePanelProps {
   projects: Project[]
@@ -16,11 +22,11 @@ export function HomePanel({
 }: HomePanelProps) {
   const openTaskCount = projects.reduce(
     (total, project) =>
-      total + project.taskCounts.todo + project.taskCounts['in-progress'],
+      total + countsFor(project).todo + countsFor(project)['in-progress'],
     0,
   )
   const inProgressCount = projects.reduce(
-    (total, project) => total + project.taskCounts['in-progress'],
+    (total, project) => total + countsFor(project)['in-progress'],
     0,
   )
 
@@ -67,7 +73,7 @@ export function HomePanel({
               <div className="home-project__counts">
                 {columns.map((column) => (
                   <span key={column.id}>
-                    <strong>{project.taskCounts[column.id]}</strong>
+                    <strong>{countsFor(project)[column.id]}</strong>
                     {column.title}
                   </span>
                 ))}
@@ -77,7 +83,11 @@ export function HomePanel({
               {project.bookmarked && (
                 <span className="role-pill">Bookmarked</span>
               )}
-              <span className="role-pill">{project.role}</span>
+              <span className="role-pill">
+                {typeof project.role === 'string' && project.role
+                  ? project.role
+                  : 'Member'}
+              </span>
               <button
                 className={
                   project.bookmarked
