@@ -10,14 +10,18 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core'
 import './styles.css'
+import { ActivityPanel } from './components/ActivityPanel'
 import { AuthPage } from './components/AuthPage'
 import { CallPanel } from './components/CallPanel'
 import { BoardColumn } from './components/BoardColumn'
+import { BoardFilters } from './components/BoardFilters'
 import { HomePanel } from './components/HomePanel'
+import { MyTasksPanel } from './components/MyTasksPanel'
 import { MembersModal } from './components/MembersModal'
 import { MessagesPanel } from './components/MessagesPanel'
 import { ProjectFormModal } from './components/ProjectFormModal'
 import { TaskCardPreview } from './components/TaskCard'
+import { TaskCommentsModal } from './components/TaskCommentsModal'
 import { TaskFormModal } from './components/TaskFormModal'
 import { columns } from './data/columns'
 import { auth } from './lib/firebase'
@@ -27,8 +31,9 @@ import {
   sortProjects,
   type ProjectSort,
 } from './utils/projects'
-import { taskToInput } from './utils/tasks'
+import { filterBoardTasks, taskToInput, type BoardFilters as BoardFilterState } from './utils/tasks'
 import type {
+  AssignedTask,
   Conversation,
   Message,
   Project,
@@ -45,7 +50,65 @@ const projectSorts: { id: ProjectSort; label: string }[] = [
   { id: 'recent', label: 'Recent' },
 ]
 
-type AppSection = 'home' | 'board' | 'messages' | 'call'
+type AppSection = 'home' | 'my-tasks' | 'board' | 'activity' | 'messages' | 'call'
+
+const emptyBoardFilters: BoardFilterState = {
+  assigneeId: 'all',
+  priority: 'all',
+  overdueOnly: false,
+}
+
+function pageHeading(section: AppSection, project: Project | null) {
+  if (section === 'home') {
+    return {
+      eyebrow: 'Home',
+      title: 'Your projects',
+      description:
+        'Pick a project to open its board. Bookmarks stay at the top when you sort by bookmark.',
+    }
+  }
+
+  if (section === 'my-tasks') {
+    return {
+      eyebrow: 'My tasks',
+      title: 'Assigned to you',
+      description:
+        'Tasks from every project you belong to, with the soonest due date first.',
+    }
+  }
+
+  if (section === 'activity') {
+    return {
+      eyebrow: 'Activity',
+      title: project?.name ?? 'Select a project',
+      description: project ? 'Recent changes in this project.' : '',
+    }
+  }
+
+  if (section === 'messages') {
+    return {
+      eyebrow: 'Team messages',
+      title: project?.name ?? 'Select a project',
+      description: project?.description ?? '',
+    }
+  }
+
+  if (section === 'call') {
+    return {
+      eyebrow: 'Calls',
+      title: project?.name ?? 'Select a project',
+      description: project
+        ? 'Private rooms. Only the people you invite can see a call.'
+        : '',
+    }
+  }
+
+  return {
+    eyebrow: 'Project board',
+    title: project?.name ?? 'Select a project',
+    description: project?.description ?? '',
+  }
+}
 
 function App() {
   const [user, setUser] = useState<User | null>(null)
@@ -62,7 +125,11 @@ function App() {
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [isProjectFormOpen, setIsProjectFormOpen] = useState(false)
   const [isMembersOpen, setIsMembersOpen] = useState(false)
+  const [commentingTask, setCommentingTask] = useState<Task | null>(null)
   const [section, setSection] = useState<AppSection>('home')
+  const [assignedTasks, setAssignedTasks] = useState<AssignedTask[]>([])
+  const [isAssignedLoading, setIsAssignedLoading] = useState(false)
+  const [boardFilters, setBoardFilters] = useState<BoardFilterState>(emptyBoardFilters)
   const [projectSort, setProjectSort] = useState<ProjectSort>('name')
   const [isSortOpen, setIsSortOpen] = useState(false)
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -170,6 +237,37 @@ function App() {
   }, [activeProjectId])
 
   useEffect(() => {
+    setBoardFilters(emptyBoardFilters)
+    setCommentingTask(null)
+  }, [activeProjectId])
+
+  useEffect(() => {
+    if (section !== 'my-tasks') return
+
+    let isCurrent = true
+    setIsAssignedLoading(true)
+
+    async function loadAssignedTasks() {
+      try {
+        const savedTasks = await tasksApi.mine()
+        if (!isCurrent) return
+        setAssignedTasks(savedTasks)
+        setRequestError('')
+      } catch {
+        if (isCurrent) setRequestError('Your tasks could not be loaded.')
+      } finally {
+        if (isCurrent) setIsAssignedLoading(false)
+      }
+    }
+
+    void loadAssignedTasks()
+
+    return () => {
+      isCurrent = false
+    }
+  }, [section])
+
+  useEffect(() => {
     if (section !== 'messages' || !activeProjectId) return
 
     let isCurrent = true
@@ -177,7 +275,7 @@ function App() {
     setActiveConversationId('')
     setMessages([])
 
-    async function loadConversations() {
+    async function loadConversations(announceError: boolean) {
       try {
         const savedConversations = await messagesApi.listConversations(activeProjectId)
         if (!isCurrent) return
@@ -189,14 +287,16 @@ function App() {
         )
         setRequestError('')
       } catch {
-        if (isCurrent) setRequestError('Chats could not be loaded.')
+        if (isCurrent && announceError) setRequestError('Chats could not be loaded.')
       }
     }
 
-    void loadConversations()
+    void loadConversations(true)
+    const refreshId = window.setInterval(() => void loadConversations(false), 8000)
 
     return () => {
       isCurrent = false
+      window.clearInterval(refreshId)
     }
   }, [activeProjectId, section])
 
@@ -419,6 +519,21 @@ function App() {
         ),
       ]
     })
+    setRequestError('')
+  }
+
+  async function leaveConversation(conversationId: string) {
+    if (!activeProjectId) throw new Error('Select a project first')
+
+    await messagesApi.leave(activeProjectId, conversationId)
+    const remaining = conversations.filter(
+      (conversation) => conversation.id !== conversationId,
+    )
+    setConversations(remaining)
+    if (activeConversationId === conversationId) {
+      setActiveConversationId(remaining[0]?.id ?? '')
+      setMessages([])
+    }
     setRequestError('')
   }
 
@@ -719,12 +834,30 @@ function App() {
           </button>
           <button
             className={
+              section === 'my-tasks' ? 'nav-link nav-link--active' : 'nav-link'
+            }
+            type="button"
+            onClick={() => setSection('my-tasks')}
+          >
+            My tasks
+          </button>
+          <button
+            className={
               section === 'board' ? 'nav-link nav-link--active' : 'nav-link'
             }
             type="button"
             onClick={() => setSection('board')}
           >
             Board
+          </button>
+          <button
+            className={
+              section === 'activity' ? 'nav-link nav-link--active' : 'nav-link'
+            }
+            type="button"
+            onClick={() => setSection('activity')}
+          >
+            Activity
           </button>
           <button
             className={
@@ -767,38 +900,15 @@ function App() {
       <main>
         <header className="page-header">
           <div>
-            <p className="eyebrow">
-              {section === 'home'
-                ? 'Home'
-                : section === 'messages'
-                  ? 'Team messages'
-                  : section === 'call'
-                    ? 'Calls'
-                    : 'Project board'}
-            </p>
-            <h1>
-              {section === 'home'
-                ? 'Your projects'
-                : (activeProject?.name ?? 'Select a project')}
-            </h1>
-            {section === 'home' ? (
+            <p className="eyebrow">{pageHeading(section, activeProject).eyebrow}</p>
+            <h1>{pageHeading(section, activeProject).title}</h1>
+            {pageHeading(section, activeProject).description && (
               <p className="project-description">
-                Pick a project to open its board. Bookmarks stay at the top
-                when you sort by bookmark.
+                {pageHeading(section, activeProject).description}
               </p>
-            ) : section === 'call' ? (
-              activeProject && (
-                <p className="project-description">
-                  Private rooms. Only the people you invite can see a call.
-                </p>
-              )
-            ) : (
-              activeProject?.description && (
-                <p className="project-description">{activeProject.description}</p>
-              )
             )}
           </div>
-          {section !== 'home' && section !== 'call' && (
+          {(section === 'board' || section === 'messages' || section === 'activity') && (
           <div className="page-actions">
             {activeProject && !activeProject.canManage && (
               <button
@@ -870,10 +980,34 @@ function App() {
           />
         )}
 
+        {isAssignedLoading && section === 'my-tasks' && assignedTasks.length === 0 && (
+          <p className="loading-message" role="status">
+            Loading your tasks...
+          </p>
+        )}
+
+        {section === 'my-tasks' && !(isAssignedLoading && assignedTasks.length === 0) && (
+          <MyTasksPanel
+            tasks={assignedTasks}
+            isLoading={isAssignedLoading}
+            onOpenTask={(task) => openProject(task.projectId)}
+          />
+        )}
+
         {isLoading && section === 'board' && (
           <p className="loading-message" role="status">
             Loading tasks...
           </p>
+        )}
+
+        {section === 'activity' && !activeProject && (
+          <p className="loading-message" role="status">
+            Select a project to see its activity.
+          </p>
+        )}
+
+        {section === 'activity' && activeProject && (
+          <ActivityPanel key={activeProject.id} projectId={activeProject.id} />
         )}
 
         {section === 'call' && !activeProject && (
@@ -905,11 +1039,22 @@ function App() {
             canManage={activeProject.canManage}
             onCreate={createConversation}
             onSend={sendMessage}
+            onLeave={(conversationId) => leaveConversation(conversationId)}
             onDelete={deleteMessage}
           />
         )}
 
         {section === 'board' && (
+        <>
+        <BoardFilters
+          members={members}
+          filters={boardFilters}
+          onChange={setBoardFilters}
+        />
+        {tasks.length > 0 &&
+          filterBoardTasks(tasks, boardFilters).length === 0 && (
+            <p className="board-filters__empty">No tasks match these filters.</p>
+          )}
         <DndContext
           sensors={dragSensors}
           autoScroll={{
@@ -926,10 +1071,13 @@ function App() {
               <BoardColumn
                 key={column.id}
                 column={column}
-                tasks={tasks.filter((task) => task.status === column.id)}
+                tasks={filterBoardTasks(tasks, boardFilters).filter(
+                  (task) => task.status === column.id,
+                )}
                 onMoveTask={moveTask}
                 onEditTask={openEditTaskForm}
                 onDeleteTask={deleteTask}
+                onCommentTask={setCommentingTask}
               />
             ))}
           </section>
@@ -937,8 +1085,18 @@ function App() {
             {draggedTask ? <TaskCardPreview task={draggedTask} /> : null}
           </DragOverlay>
         </DndContext>
+        </>
         )}
       </main>
+
+      {commentingTask && activeProject && user && (
+        <TaskCommentsModal
+          projectId={activeProject.id}
+          task={commentingTask}
+          currentUserId={user.uid}
+          onClose={() => setCommentingTask(null)}
+        />
+      )}
 
       {isTaskFormOpen && (
         <TaskFormModal

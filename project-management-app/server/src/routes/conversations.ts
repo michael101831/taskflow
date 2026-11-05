@@ -2,9 +2,11 @@ import { Router } from 'express'
 import {
   createConversation,
   findMemberConversation,
+  leaveOrDeleteConversation,
   listConversations,
   serializeConversation,
 } from '../lib/conversations.js'
+import { recordActivity } from '../lib/activity.js'
 import { prisma } from '../lib/prisma.js'
 
 export const conversationsRouter = Router({ mergeParams: true })
@@ -83,14 +85,41 @@ conversationsRouter.post('/', async (request, response, next) => {
       return
     }
 
-    response
-      .status(result.created ? 201 : 200)
-      .json(
-        serializeConversation(
-          result.conversation,
-          response.locals.user.uid as string,
-        ),
-      )
+    const conversation = serializeConversation(
+      result.conversation,
+      response.locals.user.uid as string,
+    )
+
+    if (result.created) {
+      await recordActivity({
+        projectId: response.locals.projectId as string,
+        actorId: response.locals.user.uid as string,
+        kind: 'CHAT_CREATED',
+        subject: conversation.name,
+        detail: conversation.kind,
+      })
+    }
+
+    response.status(result.created ? 201 : 200).json(conversation)
+  } catch (error) {
+    next(error)
+  }
+})
+
+conversationsRouter.delete('/:conversationId', async (request, response, next) => {
+  try {
+    const action = await leaveOrDeleteConversation(
+      response.locals.projectId as string,
+      String(request.params.conversationId),
+      response.locals.user.uid as string,
+    )
+
+    if (!action) {
+      response.status(404).json({ message: 'Chat not found' })
+      return
+    }
+
+    response.json({ action })
   } catch (error) {
     next(error)
   }

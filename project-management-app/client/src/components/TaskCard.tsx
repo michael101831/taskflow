@@ -6,6 +6,7 @@ interface TaskCardProps {
   onMove: (taskId: number, status: TaskStatus) => void
   onEdit: (task: Task) => void
   onDelete: (task: Task) => void
+  onComment: (task: Task) => void
 }
 
 const statusOrder: TaskStatus[] = ['todo', 'in-progress', 'done']
@@ -15,6 +16,7 @@ export function TaskCard({
   onMove,
   onEdit,
   onDelete,
+  onComment,
 }: TaskCardProps) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `task-${task.id}`,
@@ -61,6 +63,9 @@ export function TaskCard({
 
       <div className="task-card__actions">
         <div className="task-card__manage">
+          <button type="button" onClick={() => onComment(task)}>
+            Comments
+          </button>
           <button type="button" onClick={() => onEdit(task)}>
             Edit
           </button>

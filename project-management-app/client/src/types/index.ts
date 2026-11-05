@@ -17,6 +17,11 @@ export interface Task {
   assignee: UserSummary | null
 }
 
+export interface AssignedTask extends Task {
+  projectId: string
+  projectName: string
+}
+
 export type TaskInput = Omit<Task, 'id' | 'assignee'> & {
   assigneeId: string | null
 }
@@ -60,6 +65,28 @@ export interface Conversation {
   updatedAt: string
   members: UserSummary[]
   lastMessage: { body: string; createdAt: string } | null
+}
+
+export interface TaskComment {
+  id: string
+  body: string
+  createdAt: string
+  author: UserSummary
+}
+
+export type ActivityKind =
+  | 'task-created'
+  | 'task-moved'
+  | 'member-added'
+  | 'chat-created'
+
+export interface ActivityEvent {
+  id: string
+  kind: ActivityKind
+  subject: string
+  detail: string | null
+  createdAt: string
+  actor: UserSummary
 }
 
 export interface Message {

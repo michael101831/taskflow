@@ -169,6 +169,52 @@ describe('project and task API', () => {
       }),
     ])
 
+    const sooner = await request(app)
+      .post(`/api/projects/${projectId}/tasks`)
+      .set('Authorization', 'Bearer owner-token')
+      .send({
+        title: 'Book the venue',
+        description: 'Hold a date.',
+        status: 'todo',
+        priority: 'medium',
+        dueDate: '2026-10-01',
+        assigneeId: 'integration-owner',
+      })
+
+    expect(sooner.status).toBe(201)
+
+    const mine = await request(app)
+      .get('/api/tasks/mine')
+      .set('Authorization', 'Bearer owner-token')
+
+    expect(mine.status).toBe(200)
+    expect(
+      mine.body
+        .filter((task: { projectId: string }) => task.projectId === projectId)
+        .map((task: { title: string }) => task.title),
+    ).toEqual(['Book the venue', 'Research events API'])
+    expect(mine.body).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          title: 'Book the venue',
+          projectId,
+          projectName: 'Integration Events',
+        }),
+      ]),
+    )
+
+    const outsiderMine = await request(app)
+      .get('/api/tasks/mine')
+      .set('Authorization', 'Bearer outsider-token')
+
+    expect(outsiderMine.status).toBe(200)
+    expect(outsiderMine.body.map((task: { id: number }) => task.id)).not.toContain(
+      taskResponse.body.id,
+    )
+
+    const unauthenticatedMine = await request(app).get('/api/tasks/mine')
+    expect(unauthenticatedMine.status).toBe(401)
+
     const listedProjects = await request(app)
       .get('/api/projects')
       .set('Authorization', 'Bearer owner-token')
@@ -178,11 +224,121 @@ describe('project and task API', () => {
       expect.arrayContaining([
         expect.objectContaining({
           id: projectId,
-          taskCounts: { todo: 0, 'in-progress': 0, done: 1 },
+          taskCounts: { todo: 1, 'in-progress': 0, done: 1 },
         }),
       ]),
     )
-  })
+  }, 20000)
+
+  it('records project activity and task comments', async () => {
+    const projectResponse = await request(app)
+      .post('/api/projects')
+      .set('Authorization', 'Bearer owner-token')
+      .send({ name: 'Integration History', description: 'Activity and comments.' })
+
+    const projectId = projectResponse.body.id as string
+
+    const hidden = await request(app)
+      .get(`/api/projects/${projectId}/activity`)
+      .set('Authorization', 'Bearer outsider-token')
+
+    expect(hidden.status).toBe(403)
+
+    const taskResponse = await request(app)
+      .post(`/api/projects/${projectId}/tasks`)
+      .set('Authorization', 'Bearer owner-token')
+      .send({
+        title: 'Research events API',
+        description: 'Compare providers.',
+        status: 'todo',
+        priority: 'high',
+        dueDate: '2026-11-02',
+        assigneeId: 'integration-owner',
+      })
+
+    await request(app)
+      .put(`/api/projects/${projectId}/tasks/${taskResponse.body.id}`)
+      .set('Authorization', 'Bearer owner-token')
+      .send({
+        ...taskResponse.body,
+        status: 'in-progress',
+        assigneeId: 'integration-owner',
+      })
+
+    await request(app)
+      .post(`/api/projects/${projectId}/members`)
+      .set('Authorization', 'Bearer owner-token')
+      .send({ email: 'outsider@taskflow.test' })
+
+    await request(app)
+      .post(`/api/projects/${projectId}/conversations`)
+      .set('Authorization', 'Bearer owner-token')
+      .send({ kind: 'group', name: 'Notes', memberIds: ['integration-outsider'] })
+
+    const activity = await request(app)
+      .get(`/api/projects/${projectId}/activity`)
+      .set('Authorization', 'Bearer owner-token')
+
+    expect(activity.status).toBe(200)
+    expect(activity.body).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'chat-created',
+          subject: 'Team',
+          detail: 'team',
+          actor: expect.objectContaining({ id: 'integration-owner' }),
+        }),
+        expect.objectContaining({ kind: 'task-created', subject: 'Research events API' }),
+        expect.objectContaining({
+          kind: 'task-moved',
+          subject: 'Research events API',
+          detail: 'To do to In progress',
+        }),
+        expect.objectContaining({ kind: 'member-added', subject: 'Outsider' }),
+        expect.objectContaining({
+          kind: 'chat-created',
+          subject: 'Notes',
+          detail: 'group',
+        }),
+      ]),
+    )
+
+    const comment = await request(app)
+      .post(`/api/projects/${projectId}/tasks/${taskResponse.body.id}/comments`)
+      .set('Authorization', 'Bearer owner-token')
+      .send({ body: 'Looks good' })
+
+    expect(comment.status).toBe(201)
+    expect(comment.body).toMatchObject({
+      body: 'Looks good',
+      author: { id: 'integration-owner' },
+    })
+
+    const comments = await request(app)
+      .get(`/api/projects/${projectId}/tasks/${taskResponse.body.id}/comments`)
+      .set('Authorization', 'Bearer outsider-token')
+
+    expect(comments.status).toBe(200)
+    expect(comments.body).toEqual([
+      expect.objectContaining({ body: 'Looks good' }),
+    ])
+
+    const forbiddenDelete = await request(app)
+      .delete(
+        `/api/projects/${projectId}/tasks/${taskResponse.body.id}/comments/${comment.body.id}`,
+      )
+      .set('Authorization', 'Bearer outsider-token')
+
+    expect(forbiddenDelete.status).toBe(403)
+
+    const deleted = await request(app)
+      .delete(
+        `/api/projects/${projectId}/tasks/${taskResponse.body.id}/comments/${comment.body.id}`,
+      )
+      .set('Authorization', 'Bearer owner-token')
+
+    expect(deleted.status).toBe(204)
+  }, 20000)
 
   it('lets members bookmark a project and exchange messages', async () => {
     const projectResponse = await request(app)
@@ -313,7 +469,95 @@ describe('project and task API', () => {
       .set('Authorization', 'Bearer outsider-token')
 
     expect(missingChat.status).toBe(404)
-  })
+
+    const leftDirect = await request(app)
+      .delete(`/api/projects/${projectId}/conversations/${direct.body.id}`)
+      .set('Authorization', 'Bearer outsider-token')
+
+    expect(leftDirect.status).toBe(200)
+    expect(leftDirect.body).toEqual({ action: 'left' })
+
+    const outsiderAfterLeave = await request(app)
+      .get(`/api/projects/${projectId}/conversations`)
+      .set('Authorization', 'Bearer outsider-token')
+
+    expect(outsiderAfterLeave.body.map((chat: { id: string }) => chat.id)).not.toContain(
+      direct.body.id,
+    )
+
+    const rejoinedDirect = await request(app)
+      .post(`/api/projects/${projectId}/conversations`)
+      .set('Authorization', 'Bearer outsider-token')
+      .send({ kind: 'direct', memberIds: ['integration-owner'] })
+
+    expect(rejoinedDirect.status).toBe(200)
+    expect(rejoinedDirect.body.id).toBe(direct.body.id)
+    expect(rejoinedDirect.body.members).toHaveLength(2)
+
+    const ownerLeavesDirect = await request(app)
+      .delete(`/api/projects/${projectId}/conversations/${direct.body.id}`)
+      .set('Authorization', 'Bearer owner-token')
+
+    expect(ownerLeavesDirect.body).toEqual({ action: 'left' })
+
+    const deletedDirect = await request(app)
+      .delete(`/api/projects/${projectId}/conversations/${direct.body.id}`)
+      .set('Authorization', 'Bearer outsider-token')
+
+    expect(deletedDirect.body).toEqual({ action: 'deleted' })
+
+    const deletedAgain = await request(app)
+      .delete(`/api/projects/${projectId}/conversations/${direct.body.id}`)
+      .set('Authorization', 'Bearer outsider-token')
+
+    expect(deletedAgain.status).toBe(404)
+
+    const leftGroup = await request(app)
+      .delete(`/api/projects/${projectId}/conversations/${group.body.id}`)
+      .set('Authorization', 'Bearer outsider-token')
+
+    expect(leftGroup.body).toEqual({ action: 'left' })
+
+    const deletedGroup = await request(app)
+      .delete(`/api/projects/${projectId}/conversations/${group.body.id}`)
+      .set('Authorization', 'Bearer owner-token')
+
+    expect(deletedGroup.body).toEqual({ action: 'deleted' })
+
+    const leftTeam = await request(app)
+      .delete(`/api/projects/${projectId}/conversations/${conversationId}`)
+      .set('Authorization', 'Bearer outsider-token')
+
+    expect(leftTeam.body).toEqual({ action: 'left' })
+
+    const ownerChats = await request(app)
+      .get(`/api/projects/${projectId}/conversations`)
+      .set('Authorization', 'Bearer owner-token')
+
+    expect(ownerChats.body.map((chat: { id: string }) => chat.id)).toContain(conversationId)
+
+    const outsiderChats = await request(app)
+      .get(`/api/projects/${projectId}/conversations`)
+      .set('Authorization', 'Bearer outsider-token')
+
+    expect(outsiderChats.body.map((chat: { id: string }) => chat.id)).not.toContain(
+      conversationId,
+    )
+
+    const deletedTeam = await request(app)
+      .delete(`/api/projects/${projectId}/conversations/${conversationId}`)
+      .set('Authorization', 'Bearer owner-token')
+
+    expect(deletedTeam.body).toEqual({ action: 'deleted' })
+
+    const afterTeamDelete = await request(app)
+      .get(`/api/projects/${projectId}/conversations`)
+      .set('Authorization', 'Bearer owner-token')
+
+    expect(afterTeamDelete.body.map((chat: { id: string }) => chat.id)).not.toContain(
+      conversationId,
+    )
+  }, 20000)
 
   it('lets a member leave and lets the manager delete the project', async () => {
     const projectResponse = await request(app)

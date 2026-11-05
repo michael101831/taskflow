@@ -8,6 +8,7 @@ interface BoardColumnProps {
   onMoveTask: (taskId: number, status: TaskStatus) => void
   onEditTask: (task: Task) => void
   onDeleteTask: (task: Task) => void
+  onCommentTask: (task: Task) => void
 }
 
 export function BoardColumn({
@@ -16,6 +17,7 @@ export function BoardColumn({
   onMoveTask,
   onEditTask,
   onDeleteTask,
+  onCommentTask,
 }: BoardColumnProps) {
   const { isOver, setNodeRef } = useDroppable({
     id: column.id,
@@ -39,6 +41,7 @@ export function BoardColumn({
             onMove={onMoveTask}
             onEdit={onEditTask}
             onDelete={onDeleteTask}
+            onComment={onCommentTask}
           />
         ))}
       </div>

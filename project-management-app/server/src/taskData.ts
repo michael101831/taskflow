@@ -92,6 +92,19 @@ export function parseTaskInput(value: unknown): TaskInput | null {
   }
 }
 
+export function serializeAssignedTask(
+  task: Task & {
+    assignee: User | null
+    project: { id: string; name: string }
+  },
+) {
+  return {
+    ...serializeTask(task),
+    projectId: task.project.id,
+    projectName: task.project.name,
+  }
+}
+
 export function serializeTask(
   task: Task & { assignee: User | null },
 ) {

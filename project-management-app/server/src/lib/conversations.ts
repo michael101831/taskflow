@@ -16,59 +16,21 @@ type ConversationRecord = Prisma.ConversationGetPayload<{
   include: typeof conversationInclude
 }>
 
-export async function ensureTeamConversation(projectId: string) {
-  const existing = await prisma.conversation.findFirst({
+export async function addProjectMemberToTeamChat(projectId: string, userId: string) {
+  const team = await prisma.conversation.findFirst({
     where: { projectId, kind: ConversationKind.TEAM },
-  })
-  const projectMembers = await prisma.projectMember.findMany({
-    where: { projectId },
-    select: { userId: true },
+    select: { id: true },
   })
 
-  if (!existing) {
-    try {
-      return await prisma.conversation.create({
-        data: {
-          projectId,
-          name: 'Team',
-          kind: ConversationKind.TEAM,
-          members: {
-            create: projectMembers.map((member) => ({ userId: member.userId })),
-          },
-        },
-      })
-    } catch (error) {
-      if (
-        !(error instanceof Prisma.PrismaClientKnownRequestError) ||
-        error.code !== 'P2002'
-      ) {
-        throw error
-      }
-    }
-  }
-
-  const team =
-    existing ??
-    (await prisma.conversation.findFirst({
-      where: { projectId, kind: ConversationKind.TEAM },
-    }))
-
-  if (!team) throw new Error('Team chat could not be created')
+  if (!team) return
 
   await prisma.conversationMember.createMany({
-    data: projectMembers.map((member) => ({
-      conversationId: team.id,
-      userId: member.userId,
-    })),
+    data: [{ conversationId: team.id, userId }],
     skipDuplicates: true,
   })
-
-  return team
 }
 
 export async function listConversations(projectId: string, userId: string) {
-  await ensureTeamConversation(projectId)
-
   return prisma.conversation.findMany({
     where: { projectId, members: { some: { userId } } },
     include: conversationInclude,
@@ -183,7 +145,20 @@ export async function createConversation(input: {
       include: conversationInclude,
     })
 
-    if (existing) return { conversation: existing, created: false as const }
+    if (existing) {
+      await prisma.conversationMember.createMany({
+        data: [input.creatorId, coworkerId].map((userId) => ({
+          conversationId: existing.id,
+          userId,
+        })),
+        skipDuplicates: true,
+      })
+      const conversation = await prisma.conversation.findUniqueOrThrow({
+        where: { id: existing.id },
+        include: conversationInclude,
+      })
+      return { conversation, created: false as const }
+    }
 
     const conversation = await prisma.conversation.create({
       data: {
@@ -223,6 +198,35 @@ export async function createConversation(input: {
   })
 
   return { conversation, created: true as const }
+}
+
+export async function leaveOrDeleteConversation(
+  projectId: string,
+  conversationId: string,
+  userId: string,
+) {
+  return prisma.$transaction(async (tx) => {
+    const conversation = await tx.conversation.findFirst({
+      where: {
+        id: conversationId,
+        projectId,
+        members: { some: { userId } },
+      },
+      include: { _count: { select: { members: true } } },
+    })
+
+    if (!conversation) return null
+
+    if (conversation._count.members <= 1) {
+      await tx.conversation.delete({ where: { id: conversation.id } })
+      return 'deleted' as const
+    }
+
+    await tx.conversationMember.delete({
+      where: { conversationId_userId: { conversationId: conversation.id, userId } },
+    })
+    return 'left' as const
+  })
 }
 
 export function findMemberConversation(

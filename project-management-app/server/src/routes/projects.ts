@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { prisma } from '../lib/prisma.js'
-import { ensureTeamConversation } from '../lib/conversations.js'
+import { recordActivity } from '../lib/activity.js'
+import { addProjectMemberToTeamChat } from '../lib/conversations.js'
 import { createManagedProject, memberRoleFor } from '../lib/projectSetup.js'
 import { requireProjectMember } from '../middleware/requireProjectMember.js'
 import {
@@ -299,6 +300,16 @@ projectsRouter.post(
         return
       }
 
+      const alreadyMember = await prisma.projectMember.findUnique({
+        where: {
+          projectId_userId: {
+            projectId: response.locals.projectId as string,
+            userId: user.id,
+          },
+        },
+        select: { userId: true },
+      })
+
       const membership = await prisma.projectMember.upsert({
         where: {
           projectId_userId: {
@@ -315,7 +326,19 @@ projectsRouter.post(
         include: { user: true, role: true },
       })
 
-      await ensureTeamConversation(response.locals.projectId as string)
+      await addProjectMemberToTeamChat(
+        response.locals.projectId as string,
+        user.id,
+      )
+
+      if (!alreadyMember) {
+        await recordActivity({
+          projectId: response.locals.projectId as string,
+          actorId: response.locals.user.uid as string,
+          kind: 'MEMBER_ADDED',
+          subject: user.displayName || user.email,
+        })
+      }
 
       response.status(201).json(serializeMember(membership))
     } catch (error) {

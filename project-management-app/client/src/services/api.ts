@@ -1,4 +1,6 @@
 import type {
+  ActivityEvent,
+  AssignedTask,
   CallRoom,
   Conversation,
   Message,
@@ -6,6 +8,7 @@ import type {
   ProjectMember,
   ProjectRole,
   Task,
+  TaskComment,
   TaskInput,
 } from '../types'
 import { auth } from '../lib/firebase'
@@ -63,6 +66,8 @@ export const tasksApi = {
   list: (projectId: string) =>
     request<Task[]>(apiUrl(`/api/projects/${projectId}/tasks`)),
 
+  mine: () => request<AssignedTask[]>(apiUrl('/api/tasks/mine')),
+
   create: (projectId: string, task: TaskInput) =>
     request<Task>(apiUrl(`/api/projects/${projectId}/tasks`), {
       method: 'POST',
@@ -79,6 +84,26 @@ export const tasksApi = {
     request<void>(apiUrl(`/api/projects/${projectId}/tasks/${id}`), {
       method: 'DELETE',
     }),
+
+  listComments: (projectId: string, taskId: number) =>
+    request<TaskComment[]>(
+      apiUrl(`/api/projects/${projectId}/tasks/${taskId}/comments`),
+    ),
+
+  createComment: (projectId: string, taskId: number, body: string) =>
+    request<TaskComment>(
+      apiUrl(`/api/projects/${projectId}/tasks/${taskId}/comments`),
+      {
+        method: 'POST',
+        body: JSON.stringify({ body }),
+      },
+    ),
+
+  removeComment: (projectId: string, taskId: number, commentId: string) =>
+    request<void>(
+      apiUrl(`/api/projects/${projectId}/tasks/${taskId}/comments/${commentId}`),
+      { method: 'DELETE' },
+    ),
 }
 
 export const callsApi = {
@@ -90,6 +115,11 @@ export const callsApi = {
       method: 'POST',
       body: JSON.stringify(input),
     }),
+}
+
+export const activityApi = {
+  list: (projectId: string) =>
+    request<ActivityEvent[]>(apiUrl(`/api/projects/${projectId}/activity`)),
 }
 
 export const projectsApi = {
@@ -159,6 +189,12 @@ export const messagesApi = {
       method: 'POST',
       body: JSON.stringify(input),
     }),
+
+  leave: (projectId: string, conversationId: string) =>
+    request<{ action: 'left' | 'deleted' }>(
+      apiUrl(`/api/projects/${projectId}/conversations/${conversationId}`),
+      { method: 'DELETE' },
+    ),
 
   remove: (projectId: string, conversationId: string, messageId: string) =>
     request<void>(

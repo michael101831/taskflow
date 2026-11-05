@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import type { Conversation, Message, ProjectMember } from '../types'
 import { roleLabel } from '../utils/roles'
 
@@ -18,6 +18,7 @@ interface MessagesPanelProps {
     wholeProject?: boolean
   }) => Promise<void>
   onSend: (body: string) => Promise<void>
+  onLeave: (conversationId: string) => Promise<void>
   onDelete: (messageId: string) => Promise<void>
 }
 
@@ -36,6 +37,7 @@ export function MessagesPanel({
   onSelect,
   onCreate,
   onSend,
+  onLeave,
   onDelete,
 }: MessagesPanelProps) {
   const [draft, setDraft] = useState('')
@@ -47,11 +49,19 @@ export function MessagesPanel({
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [isCreating, setIsCreating] = useState(false)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
+  const [isConfirmingChat, setIsConfirmingChat] = useState(false)
+  const [isLeavingChat, setIsLeavingChat] = useState(false)
   const coworkers = members.filter((member) => member.id !== currentUserId)
   const activeConversation = conversations.find(
     (conversation) => conversation.id === activeConversationId,
   )
   const chatKind = selectedIds.length > 1 ? 'group' : 'direct'
+  const isLastMember = (activeConversation?.members.length ?? 0) <= 1
+  const chatAction = isLastMember ? 'Delete' : 'Leave'
+
+  useEffect(() => {
+    setIsConfirmingChat(false)
+  }, [activeConversationId])
 
   function toggleMember(memberId: string) {
     setSelectedIds((current) =>
@@ -82,6 +92,24 @@ export function MessagesPanel({
       )
     } finally {
       setIsCreating(false)
+    }
+  }
+
+  async function handleLeaveChat() {
+    if (!activeConversation) return
+
+    setIsLeavingChat(true)
+    setErrorMessage('')
+
+    try {
+      await onLeave(activeConversation.id)
+      setIsConfirmingChat(false)
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : 'The chat could not be updated.',
+      )
+    } finally {
+      setIsLeavingChat(false)
     }
   }
 
@@ -279,7 +307,36 @@ export function MessagesPanel({
       <section className="messages" aria-label="Messages">
         <div className="messages__log">
           {activeConversation && (
-            <p className="messages__title">{activeConversation.name}</p>
+            <div className="messages__heading">
+              <p className="messages__title">{activeConversation.name}</p>
+              {isConfirmingChat ? (
+                <span className="message__confirm">
+                  <span>{chatAction} this chat?</span>
+                  <button
+                    type="button"
+                    disabled={isLeavingChat}
+                    onClick={() => void handleLeaveChat()}
+                  >
+                    {isLeavingChat ? 'Working...' : chatAction}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isLeavingChat}
+                    onClick={() => setIsConfirmingChat(false)}
+                  >
+                    Cancel
+                  </button>
+                </span>
+              ) : (
+                <button
+                  className="danger-button messages__chat-action"
+                  type="button"
+                  onClick={() => setIsConfirmingChat(true)}
+                >
+                  {chatAction} chat
+                </button>
+              )}
+            </div>
           )}
           {isLoading && messages.length === 0 && (
             <p className="messages__empty" role="status">

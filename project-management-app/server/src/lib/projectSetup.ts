@@ -1,3 +1,4 @@
+import { recordActivity } from './activity.js'
 import { prisma } from './prisma.js'
 
 const defaultRoles = [
@@ -44,6 +45,17 @@ export async function createManagedProject(input: {
         members: { create: { userId: input.userId } },
       },
     })
+
+    await recordActivity(
+      {
+        projectId: project.id,
+        actorId: input.userId,
+        kind: 'CHAT_CREATED',
+        subject: 'Team',
+        detail: 'team',
+      },
+      tx,
+    )
 
     return { project, managerRole }
   })

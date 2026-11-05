@@ -27,6 +27,7 @@ function renderCard(onMove = vi.fn()) {
         onMove={onMove}
         onEdit={vi.fn()}
         onDelete={vi.fn()}
+        onComment={vi.fn()}
       />
     </DndContext>,
   )
