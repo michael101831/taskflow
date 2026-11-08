@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import type { Conversation, Message, ProjectMember } from '../types'
 import { roleLabel } from '../utils/roles'
+import { Avatar, personName } from './Avatar'
 
 interface MessagesPanelProps {
   conversations: Conversation[]
@@ -20,10 +21,6 @@ interface MessagesPanelProps {
   onSend: (body: string) => Promise<void>
   onLeave: (conversationId: string) => Promise<void>
   onDelete: (messageId: string) => Promise<void>
-}
-
-function personName(person: { displayName: string | null; email: string }) {
-  return person.displayName || person.email
 }
 
 export function MessagesPanel({
@@ -353,6 +350,7 @@ export function MessagesPanel({
               <li key={message.id} className="message">
                 <div className="message__meta">
                   <span className="message__author">
+                    <Avatar person={message.author} />
                     {personName(message.author)}
                     <span className="message__role">
                       {roleLabel(message.author.role)}

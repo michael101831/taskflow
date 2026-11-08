@@ -1,5 +1,6 @@
 import { ConversationKind, Prisma } from '@prisma/client'
 import { prisma } from './prisma.js'
+import { serializeUser } from './users.js'
 
 const conversationInclude = {
   members: {
@@ -64,11 +65,7 @@ export function serializeConversation(
           ? 'direct'
           : 'group',
     updatedAt: conversation.updatedAt.toISOString(),
-    members: conversation.members.map((member) => ({
-      id: member.user.id,
-      email: member.user.email,
-      displayName: member.user.displayName,
-    })),
+    members: conversation.members.map((member) => serializeUser(member.user)),
     lastMessage: lastMessage
       ? {
           body: lastMessage.body,

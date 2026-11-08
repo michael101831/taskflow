@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import type { ProjectMember, ProjectRole } from '../types'
 import { roleLabel } from '../utils/roles'
+import { Avatar } from './Avatar'
 
 interface MembersModalProps {
   members: ProjectMember[]
@@ -104,9 +105,12 @@ export function MembersModal({
         <div className="member-list">
           {members.map((member) => (
             <div className="member-row" key={member.id}>
-              <div>
-                <strong>{member.displayName || member.email}</strong>
-                {member.displayName && <span>{member.email}</span>}
+              <div className="member-row__person">
+                <Avatar person={member} />
+                <div>
+                  <strong>{member.displayName || member.email}</strong>
+                  {member.displayName && <span>{member.email}</span>}
+                </div>
               </div>
               {canManage ? (
                 <select

@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from './prisma.js'
+import { serializeUser } from './users.js'
 
 const roomInclude = {
   members: {
@@ -31,11 +32,7 @@ export function serializeCallRoom(room: CallRoomRecord, viewerId: string) {
     id: room.id,
     name,
     kind: room.directKey ? ('direct' as const) : ('group' as const),
-    members: room.members.map((member) => ({
-      id: member.user.id,
-      email: member.user.email,
-      displayName: member.user.displayName,
-    })),
+    members: room.members.map((member) => serializeUser(member.user)),
   }
 }
 

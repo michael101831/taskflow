@@ -1,10 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ActivityEvent } from '../types'
 import { activityApi } from '../services/api'
-
-function personName(person: { displayName: string | null; email: string }) {
-  return person.displayName || person.email
-}
+import { Avatar, personName } from './Avatar'
 
 function describe(event: ActivityEvent) {
   const actor = personName(event.actor)
@@ -75,6 +72,7 @@ export function ActivityPanel({ projectId }: { projectId: string }) {
     <ol className="activity">
       {events.map((event) => (
         <li key={event.id} className="activity__item">
+          <Avatar person={event.actor} />
           <p>{describe(event)}</p>
           <time dateTime={event.createdAt}>
             {new Date(event.createdAt).toLocaleString()}

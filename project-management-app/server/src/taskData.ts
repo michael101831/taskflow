@@ -4,6 +4,7 @@ import {
   type Task,
   type User,
 } from '@prisma/client'
+import { serializeUser } from './lib/users.js'
 
 export interface TaskInput {
   title: string
@@ -115,12 +116,6 @@ export function serializeTask(
     status: statusFromDatabase[task.status],
     priority: priorityFromDatabase[task.priority],
     dueDate: task.dueDate.toISOString().slice(0, 10),
-    assignee: task.assignee
-      ? {
-          id: task.assignee.id,
-          email: task.assignee.email,
-          displayName: task.assignee.displayName,
-        }
-      : null,
+    assignee: task.assignee ? serializeUser(task.assignee) : null,
   }
 }

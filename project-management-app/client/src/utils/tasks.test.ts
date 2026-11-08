@@ -13,6 +13,7 @@ const task: Task = {
     id: 'developer-id',
     email: 'developer@taskflow.local',
     displayName: null,
+    photoUrl: null,
   },
 }
 

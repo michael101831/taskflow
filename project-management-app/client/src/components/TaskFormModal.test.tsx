@@ -8,6 +8,7 @@ const member: ProjectMember = {
   id: 'developer-id',
   email: 'developer@taskflow.local',
   displayName: 'Developer',
+  photoUrl: null,
   roleId: 'manager-role',
   role: 'Manager',
   canManage: true,

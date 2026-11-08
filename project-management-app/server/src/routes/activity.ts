@@ -1,6 +1,7 @@
 import { ActivityKind } from '@prisma/client'
 import { Router } from 'express'
 import { prisma } from '../lib/prisma.js'
+import { serializeUser } from '../lib/users.js'
 
 const kindToClient: Record<ActivityKind, string> = {
   TASK_CREATED: 'task-created',
@@ -27,11 +28,7 @@ activityRouter.get('/', async (_request, response, next) => {
         subject: event.subject,
         detail: event.detail,
         createdAt: event.createdAt.toISOString(),
-        actor: {
-          id: event.actor.id,
-          email: event.actor.email,
-          displayName: event.actor.displayName,
-        },
+        actor: serializeUser(event.actor),
       })),
     )
   } catch (error) {

@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from 'express'
 import { adminAuth } from '../lib/firebaseAdmin.js'
 import { prisma } from '../lib/prisma.js'
 import { createManagedProject } from '../lib/projectSetup.js'
+import { serializeUser } from '../lib/users.js'
 
 export async function requireAuth(
   request: Request,
@@ -46,12 +47,9 @@ export async function requireAuth(
       })
     }
 
-    await prisma.user.upsert({
+    const savedUser = await prisma.user.upsert({
       where: { id: user.uid },
-      update: {
-        email,
-        displayName: user.name ?? null,
-      },
+      update: { email },
       create: {
         id: user.uid,
         email,
@@ -93,8 +91,10 @@ export async function requireAuth(
     }
 
     response.locals.user = {
-      uid: user.uid,
-      email,
+      uid: savedUser.id,
+      email: savedUser.email,
+      displayName: savedUser.displayName,
+      photoUrl: serializeUser(savedUser).photoUrl,
     }
     next()
   } catch (error) {

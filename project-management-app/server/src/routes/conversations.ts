@@ -7,7 +7,9 @@ import {
   serializeConversation,
 } from '../lib/conversations.js'
 import { recordActivity } from '../lib/activity.js'
+import { messagePreview, notifyUsers } from '../lib/notifications.js'
 import { prisma } from '../lib/prisma.js'
+import { serializeUser } from '../lib/users.js'
 
 export const conversationsRouter = Router({ mergeParams: true })
 
@@ -16,7 +18,7 @@ function serializeMessage(
     id: string
     body: string
     createdAt: Date
-    author: { id: string; email: string; displayName: string | null }
+    author: { id: string; email: string; displayName: string | null; photoUrl?: string | null }
   },
   role: string | null,
 ) {
@@ -25,9 +27,7 @@ function serializeMessage(
     body: message.body,
     createdAt: message.createdAt.toISOString(),
     author: {
-      id: message.author.id,
-      email: message.author.email,
-      displayName: message.author.displayName,
+      ...serializeUser(message.author),
       role,
     },
   }
@@ -209,6 +209,21 @@ conversationsRouter.post(
         })
 
         return created
+      })
+
+      const members = await prisma.conversationMember.findMany({
+        where: { conversationId: conversation.id },
+        select: { userId: true },
+      })
+
+      await notifyUsers({
+        recipientIds: members.map((member) => member.userId),
+        actorId: userId,
+        projectId: conversation.projectId,
+        kind: 'MESSAGE',
+        subject: conversation.name || (conversation.kind === 'DIRECT' ? 'Direct message' : 'Chat'),
+        detail: messagePreview(body),
+        conversationId: conversation.id,
       })
 
       response.status(201).json(

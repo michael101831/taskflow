@@ -37,10 +37,19 @@ enum ActivityKind {
   CHAT_CREATED
 }
 
+enum NotificationKind {
+  TASK_ASSIGNED
+  MESSAGE
+  CALL_INVITE
+}
+
 model User {
   id            String          @id
   email         String          @unique
   displayName   String?
+  photoUrl       String?
+  photoUpdatedAt DateTime?
+  photo          UserPhoto?
   memberships          ProjectMember[]
   assignedTasks        Task[]               @relation("TaskAssignee")
   messages             Message[]
@@ -49,8 +58,18 @@ model User {
   callRoomMembers      CallRoomMember[]
   activity             ActivityEvent[]
   taskComments         TaskComment[]
+  notifications        Notification[] @relation("NotificationRecipient")
+  notificationsSent    Notification[] @relation("NotificationActor")
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
+}
+
+model UserPhoto {
+  userId      String   @id
+  data        Bytes
+  contentType String
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Project {
@@ -64,6 +83,7 @@ model Project {
   conversations Conversation[]
   callRooms     CallRoom[]
   activity      ActivityEvent[]
+  notifications Notification[]
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 }
@@ -207,4 +227,24 @@ model TaskComment {
   createdAt DateTime @default(now())
 
   @@index([taskId, createdAt])
+}
+
+model Notification {
+  id             String           @id @default(cuid())
+  userId         String
+  actorId        String
+  projectId      String
+  kind           NotificationKind
+  subject        String
+  detail         String?
+  taskId         Int?
+  conversationId String?
+  callRoomId     String?
+  readAt         DateTime?
+  user           User             @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
+  actor          User             @relation("NotificationActor", fields: [actorId], references: [id], onDelete: Cascade)
+  project        Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt      DateTime         @default(now())
+
+  @@index([userId, createdAt])
 }

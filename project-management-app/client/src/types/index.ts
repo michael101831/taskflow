@@ -5,6 +5,41 @@ export interface UserSummary {
   id: string
   email: string
   displayName: string | null
+  photoUrl: string | null
+}
+
+export interface Profile {
+  uid: string
+  email: string
+  displayName: string | null
+  photoUrl: string | null
+}
+
+export type ProfilePhotoUpdate =
+  | { action: 'keep' }
+  | { action: 'remove' }
+  | { action: 'upload'; file: Blob }
+
+export type NotificationKind = 'task-assigned' | 'message' | 'call-invite'
+
+export interface AppNotification {
+  id: string
+  kind: NotificationKind
+  subject: string
+  detail: string | null
+  taskId: number | null
+  conversationId: string | null
+  callRoomId: string | null
+  readAt: string | null
+  createdAt: string
+  projectId: string
+  projectName: string
+  actor: UserSummary
+}
+
+export interface NotificationFeed {
+  unreadCount: number
+  items: AppNotification[]
 }
 
 export interface Task {

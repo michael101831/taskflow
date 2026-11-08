@@ -3,16 +3,13 @@ import { auth } from '../lib/firebase'
 import { CallSession, type CallPeer } from '../lib/teamCall'
 import { callsApi, callSocketUrl } from '../services/api'
 import type { CallRoom, ProjectMember } from '../types'
+import { Avatar, personName } from './Avatar'
 
 type CallPanelProps = {
   projectId: string
   projectName: string
   members: ProjectMember[]
   currentUserId: string
-}
-
-function personName(person: { displayName: string | null; email: string }) {
-  return person.displayName || person.email
 }
 
 function mediaError(caught: unknown) {
@@ -266,6 +263,7 @@ export function CallPanel({
                       checked={selectedIds.includes(member.id)}
                       onChange={() => toggleMember(member.id)}
                     />
+                    <Avatar person={member} />
                     {personName(member)}
                     <span>{member.role}</span>
                   </label>

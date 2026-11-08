@@ -340,6 +340,163 @@ describe('project and task API', () => {
     expect(deleted.status).toBe(204)
   }, 20000)
 
+  it('saves a profile and notifies people about assignments, messages, and calls', async () => {
+    const projectResponse = await request(app)
+      .post('/api/projects')
+      .set('Authorization', 'Bearer owner-token')
+      .send({ name: 'Integration Alerts', description: 'Profiles and notifications.' })
+
+    const projectId = projectResponse.body.id as string
+
+    const savedProfile = await request(app)
+      .patch('/api/profile')
+      .set('Authorization', 'Bearer owner-token')
+      .send({ displayName: 'Alex' })
+
+    expect(savedProfile.status).toBe(200)
+    expect(savedProfile.body).toMatchObject({
+      uid: 'integration-owner',
+      displayName: 'Alex',
+      photoUrl: null,
+    })
+
+    const invalidPhoto = await request(app)
+      .post('/api/profile/photo')
+      .set('Authorization', 'Bearer owner-token')
+      .set('Content-Type', 'image/png')
+      .send(Buffer.from('not-an-image'))
+
+    expect(invalidPhoto.status).toBe(400)
+
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+      'base64',
+    )
+    const uploaded = await request(app)
+      .post('/api/profile/photo')
+      .set('Authorization', 'Bearer owner-token')
+      .set('Content-Type', 'image/png')
+      .send(png)
+
+    expect(uploaded.status).toBe(200)
+    expect(uploaded.body.photoUrl).toMatch(/^\/api\/avatars\/integration-owner\?v=\d+$/)
+
+    const image = await request(app).get(uploaded.body.photoUrl as string)
+    expect(image.status).toBe(200)
+    expect(image.headers['content-type']).toBe('image/png')
+    expect(image.body).toEqual(png)
+
+    const profile = await request(app)
+      .get('/api/profile')
+      .set('Authorization', 'Bearer owner-token')
+
+    expect(profile.body.displayName).toBe('Alex')
+
+    await request(app)
+      .post(`/api/projects/${projectId}/members`)
+      .set('Authorization', 'Bearer owner-token')
+      .send({ email: 'outsider@taskflow.test' })
+
+    const assigned = await request(app)
+      .post(`/api/projects/${projectId}/tasks`)
+      .set('Authorization', 'Bearer owner-token')
+      .send({
+        title: 'Send the invite',
+        description: 'Tell the team.',
+        status: 'todo',
+        priority: 'medium',
+        dueDate: '2026-12-01',
+        assigneeId: 'integration-outsider',
+      })
+
+    expect(assigned.status).toBe(201)
+
+    const ownerFeed = await request(app)
+      .get('/api/notifications')
+      .set('Authorization', 'Bearer owner-token')
+
+    expect(ownerFeed.body.unreadCount).toBe(0)
+
+    const outsiderFeed = await request(app)
+      .get('/api/notifications')
+      .set('Authorization', 'Bearer outsider-token')
+
+    expect(outsiderFeed.status).toBe(200)
+    expect(outsiderFeed.body.unreadCount).toBe(1)
+    expect(outsiderFeed.body.items[0]).toMatchObject({
+      kind: 'task-assigned',
+      subject: 'Send the invite',
+      projectId,
+      actor: {
+        displayName: 'Alex',
+        photoUrl: expect.stringMatching(/^\/api\/avatars\/integration-owner\?v=\d+$/),
+      },
+    })
+
+    const conversations = await request(app)
+      .get(`/api/projects/${projectId}/conversations`)
+      .set('Authorization', 'Bearer owner-token')
+    const team = conversations.body.find(
+      (conversation: { kind: string }) => conversation.kind === 'team',
+    )
+
+    await request(app)
+      .post(`/api/projects/${projectId}/conversations/${team.id}/messages`)
+      .set('Authorization', 'Bearer owner-token')
+      .send({ body: 'The invite is ready.' })
+
+    const room = await request(app)
+      .post(`/api/projects/${projectId}/call-rooms`)
+      .set('Authorization', 'Bearer owner-token')
+      .send({ memberIds: ['integration-outsider'], name: 'Launch call' })
+
+    expect(room.status).toBe(201)
+
+    const updatedFeed = await request(app)
+      .get('/api/notifications')
+      .set('Authorization', 'Bearer outsider-token')
+
+    expect(updatedFeed.body.items.map((item: { kind: string }) => item.kind)).toEqual([
+      'call-invite',
+      'message',
+      'task-assigned',
+    ])
+
+    const marked = await request(app)
+      .post(`/api/notifications/${updatedFeed.body.items[0].id}/read`)
+      .set('Authorization', 'Bearer outsider-token')
+
+    expect(marked.status).toBe(204)
+
+    const hidden = await request(app)
+      .post(`/api/notifications/${updatedFeed.body.items[1].id}/read`)
+      .set('Authorization', 'Bearer owner-token')
+
+    expect(hidden.status).toBe(404)
+
+    const allRead = await request(app)
+      .post('/api/notifications/read')
+      .set('Authorization', 'Bearer outsider-token')
+
+    expect(allRead.status).toBe(204)
+
+    const cleared = await request(app)
+      .get('/api/notifications')
+      .set('Authorization', 'Bearer outsider-token')
+
+    expect(cleared.body.unreadCount).toBe(0)
+
+    const removed = await request(app)
+      .delete('/api/profile/photo')
+      .set('Authorization', 'Bearer owner-token')
+
+    expect(removed.status).toBe(200)
+    expect(removed.body.photoUrl).toBeNull()
+
+    const gone = await request(app).get(uploaded.body.photoUrl as string)
+    expect(gone.status).toBe(404)
+  }, 20000)
+
   it('lets members bookmark a project and exchange messages', async () => {
     const projectResponse = await request(app)
       .post('/api/projects')

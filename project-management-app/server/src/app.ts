@@ -9,9 +9,12 @@ import { prisma } from './lib/prisma.js'
 import { requireAuth } from './middleware/requireAuth.js'
 import { requireProjectMember } from './middleware/requireProjectMember.js'
 import { activityRouter } from './routes/activity.js'
+import { avatarsRouter } from './routes/avatars.js'
 import { callRoomsRouter } from './routes/callRooms.js'
 import { conversationsRouter } from './routes/conversations.js'
 import { myTasksRouter } from './routes/myTasks.js'
+import { notificationsRouter } from './routes/notifications.js'
+import { profileRouter } from './routes/profile.js'
 import { projectsRouter } from './routes/projects.js'
 import { tasksRouter } from './routes/tasks.js'
 
@@ -40,10 +43,14 @@ export function createApp() {
     }
   })
 
+  app.use('/api/avatars', avatarsRouter)
+
   app.get('/api/session', requireAuth, (_request, response) => {
     response.json(response.locals.user)
   })
 
+  app.use('/api/profile', requireAuth, profileRouter)
+  app.use('/api/notifications', requireAuth, notificationsRouter)
   app.use('/api/tasks', requireAuth, myTasksRouter)
   app.use(
     '/api/projects/:projectId/activity',

@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { prisma } from '../lib/prisma.js'
 import { recordActivity } from '../lib/activity.js'
+import { serializeUser } from '../lib/users.js'
 import { addProjectMemberToTeamChat } from '../lib/conversations.js'
 import { createManagedProject, memberRoleFor } from '../lib/projectSetup.js'
 import { requireProjectMember } from '../middleware/requireProjectMember.js'
@@ -63,12 +64,10 @@ async function taskCountsFor(projectIds: string[]) {
 function serializeMember(member: {
   roleId: string
   role: { name: string; isManager: boolean }
-  user: { id: string; email: string; displayName: string | null }
+  user: { id: string; email: string; displayName: string | null; photoUrl?: string | null }
 }) {
   return {
-    id: member.user.id,
-    email: member.user.email,
-    displayName: member.user.displayName,
+    ...serializeUser(member.user),
     roleId: member.roleId,
     role: member.role.name,
     canManage: member.role.isManager,

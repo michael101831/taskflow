@@ -47,6 +47,31 @@ button {
   background: #111827;
 }
 
+.sidebar-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16px;
+}
+
+.sidebar .notifications,
+.sidebar .notifications__button {
+  width: 100%;
+}
+
+.sidebar .notifications__button {
+  justify-content: center;
+  border-color: #354158;
+  background: #1d2739;
+  color: #fff;
+}
+
+.sidebar .notifications__panel {
+  left: 0;
+  right: 0;
+  width: auto;
+}
+
 .brand {
   display: flex;
   align-items: center;
@@ -61,9 +86,13 @@ button {
   display: grid;
   width: 34px;
   height: 34px;
+  flex: 0 0 34px;
   place-items: center;
   border-radius: 10px;
   background: #6d5dfc;
+  color: #fff;
+  font-size: 1rem;
+  line-height: 1;
 }
 
 nav {
@@ -286,6 +315,184 @@ nav {
 
 .account button:hover {
   color: #fff;
+}
+
+.account button.account__profile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  color: #fff;
+}
+
+.account__profile strong {
+  display: block;
+  overflow: hidden;
+  color: #fff;
+  font-size: 0.82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.avatar {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #5b4df0;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  object-fit: cover;
+}
+
+.page-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.notifications {
+  position: relative;
+}
+
+.notifications__button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.notifications__badge {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #5b4df0;
+  color: #fff;
+  font-size: 0.72rem;
+  line-height: 18px;
+}
+
+.notifications__panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  width: min(360px, 80vw);
+  max-height: 420px;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid #e4e8f0;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 16px 40px rgb(23 32 51 / 12%);
+  color: #172033;
+  text-align: left;
+}
+
+.notifications__panel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.notifications__panel header button,
+.notifications__panel li button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.notifications__panel header button {
+  color: #5b4df0;
+  font-size: 0.78rem;
+}
+
+.notifications__panel ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.notifications__panel li button {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  padding: 8px;
+  border-radius: 8px;
+  text-align: left;
+}
+
+.notifications__panel li button:hover,
+.notifications__item--unread {
+  background: #f4f1ff;
+}
+
+.notifications__panel small,
+.notifications__empty,
+.profile-form__hint,
+.profile-form__preview span {
+  color: #68728a;
+  font-size: 0.78rem;
+}
+
+.notifications__empty,
+.profile-form__hint {
+  margin: 0;
+}
+
+.profile-form,
+.profile-form label {
+  display: grid;
+  gap: 8px;
+}
+
+.profile-form__preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.profile-form__preview strong,
+.profile-form__preview span {
+  display: block;
+}
+
+.profile-form__photo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.profile-form__photo .secondary-button {
+  position: relative;
+  cursor: pointer;
+}
+
+.profile-form__file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.member-row .member-row__person {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
 }
 
 .status-dot {
@@ -808,6 +1015,7 @@ h1 {
 
 .activity__item {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
   padding: 14px 16px;
@@ -817,6 +1025,7 @@ h1 {
 }
 
 .activity__item p {
+  flex: 1;
   margin: 0;
   color: #172033;
 }
@@ -1545,22 +1754,36 @@ h1 {
 
   .sidebar {
     display: grid;
-    grid-template-columns: auto 1fr;
+    grid-template-columns: minmax(0, 1fr) auto auto;
     align-items: center;
-    padding: 14px 18px;
+    gap: 12px 8px;
+    padding: 14px 16px;
+  }
+
+  .sidebar-bar {
+    display: contents;
   }
 
   .brand {
-    font-size: 0;
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+    font-size: 1.02rem;
+  }
+
+  .notifications {
+    grid-column: 2;
+    grid-row: 1;
   }
 
   .sidebar-footer {
-    grid-column: 2;
+    grid-column: 3;
     grid-row: 1;
     justify-self: end;
   }
 
   .sidebar nav .nav-link {
+    flex: 0 0 auto;
     width: auto;
   }
 
@@ -1571,6 +1794,7 @@ h1 {
 
   .sidebar nav {
     display: flex;
+    overflow-x: auto;
   }
 
   .project-list {
@@ -1588,12 +1812,29 @@ h1 {
 
   .sidebar-footer {
     display: flex;
-    grid-column: 2;
-    grid-row: 1;
     align-items: center;
-    justify-self: end;
+    justify-content: flex-end;
     gap: 12px;
     margin: 0;
+  }
+
+  .notifications__button {
+    padding: 8px 10px;
+    white-space: nowrap;
+  }
+
+  .sidebar .notifications,
+  .sidebar .notifications__button {
+    width: auto;
+  }
+
+  .sidebar .notifications__panel {
+    position: fixed;
+    top: 92px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-height: calc(100dvh - 80px);
   }
 
   .account {
@@ -1632,11 +1873,12 @@ h1 {
   }
 
   .page-header {
-    align-items: start;
+    align-items: flex-start;
     flex-direction: column;
   }
 
   .page-actions {
+    flex-basis: 100%;
     width: 100%;
   }
 

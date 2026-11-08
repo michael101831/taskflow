@@ -1,5 +1,7 @@
 import { Router } from 'express'
 import { moveDetail, recordActivity } from '../lib/activity.js'
+import { notifyUsers } from '../lib/notifications.js'
+import { serializeUser } from '../lib/users.js'
 import { prisma } from '../lib/prisma.js'
 import {
   parseTaskInput,
@@ -68,12 +70,26 @@ tasksRouter.post('/', async (request, response, next) => {
       include: { assignee: true },
     })
 
+    const actorId = response.locals.user.uid as string
+    const projectId = response.locals.projectId as string
+
     await recordActivity({
-      projectId: response.locals.projectId as string,
-      actorId: response.locals.user.uid as string,
+      projectId,
+      actorId,
       kind: 'TASK_CREATED',
       subject: task.title,
     })
+
+    if (task.assigneeId) {
+      await notifyUsers({
+        recipientIds: [task.assigneeId],
+        actorId,
+        projectId,
+        kind: 'TASK_ASSIGNED',
+        subject: task.title,
+        taskId: task.id,
+      })
+    }
 
     response.status(201).json(serializeTask(task))
   } catch (error) {
@@ -104,7 +120,7 @@ tasksRouter.put('/:id', async (request, response, next) => {
     const projectId = response.locals.projectId as string
     const existing = await prisma.task.findFirst({
       where: { id, projectId },
-      select: { status: true },
+      select: { status: true, assigneeId: true },
     })
     const task = await prisma.task.update({
       where: { id, projectId },
@@ -119,13 +135,26 @@ tasksRouter.put('/:id', async (request, response, next) => {
       include: { assignee: true },
     })
 
+    const actorId = response.locals.user.uid as string
+
     if (existing && existing.status !== task.status) {
       await recordActivity({
         projectId,
-        actorId: response.locals.user.uid as string,
+        actorId,
         kind: 'TASK_MOVED',
         subject: task.title,
         detail: moveDetail(existing.status, task.status),
+      })
+    }
+
+    if (existing && task.assigneeId && task.assigneeId !== existing.assigneeId) {
+      await notifyUsers({
+        recipientIds: [task.assigneeId],
+        actorId,
+        projectId,
+        kind: 'TASK_ASSIGNED',
+        subject: task.title,
+        taskId: task.id,
       })
     }
 
@@ -187,11 +216,7 @@ tasksRouter.get('/:id/comments', async (request, response, next) => {
         id: comment.id,
         body: comment.body,
         createdAt: comment.createdAt.toISOString(),
-        author: {
-          id: comment.author.id,
-          email: comment.author.email,
-          displayName: comment.author.displayName,
-        },
+        author: serializeUser(comment.author),
       })),
     )
   } catch (error) {
@@ -237,11 +262,7 @@ tasksRouter.post('/:id/comments', async (request, response, next) => {
       id: comment.id,
       body: comment.body,
       createdAt: comment.createdAt.toISOString(),
-      author: {
-        id: comment.author.id,
-        email: comment.author.email,
-        displayName: comment.author.displayName,
-      },
+      author: serializeUser(comment.author),
     })
   } catch (error) {
     next(error)

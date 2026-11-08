@@ -19,13 +19,16 @@ import { HomePanel } from './components/HomePanel'
 import { MyTasksPanel } from './components/MyTasksPanel'
 import { MembersModal } from './components/MembersModal'
 import { MessagesPanel } from './components/MessagesPanel'
+import { NotificationMenu } from './components/NotificationMenu'
+import { ProfileModal } from './components/ProfileModal'
+import { Avatar, personName } from './components/Avatar'
 import { ProjectFormModal } from './components/ProjectFormModal'
 import { TaskCardPreview } from './components/TaskCard'
 import { TaskCommentsModal } from './components/TaskCommentsModal'
 import { TaskFormModal } from './components/TaskFormModal'
 import { columns } from './data/columns'
 import { auth } from './lib/firebase'
-import { apiUrl, messagesApi, projectsApi, tasksApi } from './services/api'
+import { apiUrl, messagesApi, notificationsApi, profileApi, projectsApi, tasksApi } from './services/api'
 import {
   applyTaskCountChange,
   sortProjects,
@@ -33,9 +36,12 @@ import {
 } from './utils/projects'
 import { filterBoardTasks, taskToInput, type BoardFilters as BoardFilterState } from './utils/tasks'
 import type {
+  AppNotification,
   AssignedTask,
   Conversation,
   Message,
+  Profile,
+  ProfilePhotoUpdate,
   Project,
   ProjectMember,
   ProjectRole,
@@ -126,6 +132,10 @@ function App() {
   const [isProjectFormOpen, setIsProjectFormOpen] = useState(false)
   const [isMembersOpen, setIsMembersOpen] = useState(false)
   const [commentingTask, setCommentingTask] = useState<Task | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const [notifications, setNotifications] = useState<AppNotification[]>([])
+  const [unreadCount, setUnreadCount] = useState(0)
   const [section, setSection] = useState<AppSection>('home')
   const [assignedTasks, setAssignedTasks] = useState<AssignedTask[]>([])
   const [isAssignedLoading, setIsAssignedLoading] = useState(false)
@@ -192,6 +202,46 @@ function App() {
 
     return () => {
       isCurrent = false
+    }
+  }, [user])
+
+  useEffect(() => {
+    if (!user) {
+      setProfile(null)
+      setNotifications([])
+      setUnreadCount(0)
+      return
+    }
+
+    let isCurrent = true
+
+    async function loadProfile() {
+      try {
+        const saved = await profileApi.get()
+        if (isCurrent) setProfile(saved)
+      } catch {
+        if (isCurrent) setProfile(null)
+      }
+    }
+
+    async function loadNotifications() {
+      try {
+        const saved = await notificationsApi.list()
+        if (!isCurrent) return
+        setNotifications(saved.items)
+        setUnreadCount(saved.unreadCount)
+      } catch {
+        // Keep the last list when a refresh fails.
+      }
+    }
+
+    void loadProfile()
+    void loadNotifications()
+    const timer = window.setInterval(() => void loadNotifications(), 15000)
+
+    return () => {
+      isCurrent = false
+      window.clearInterval(timer)
     }
   }, [user])
 
@@ -639,6 +689,97 @@ function App() {
     setSection('board')
   }
 
+  async function saveProfile(input: { displayName: string; photo: ProfilePhotoUpdate }) {
+    const saved = await profileApi.save(input)
+    setProfile(saved)
+    if (!user) return
+
+    const apply = <T extends { id: string }>(person: T): T =>
+      person.id === user.uid
+        ? { ...person, displayName: saved.displayName, photoUrl: saved.photoUrl }
+        : person
+
+    setMembers((current) => current.map(apply))
+    setTasks((current) =>
+      current.map((task) => ({
+        ...task,
+        assignee: task.assignee ? apply(task.assignee) : null,
+      })),
+    )
+    setAssignedTasks((current) =>
+      current.map((task) => ({
+        ...task,
+        assignee: task.assignee ? apply(task.assignee) : null,
+      })),
+    )
+    setConversations((current) =>
+      current.map((conversation) => ({
+        ...conversation,
+        members: conversation.members.map(apply),
+      })),
+    )
+    setMessages((current) =>
+      current.map((message) => ({
+        ...message,
+        author: apply(message.author),
+      })),
+    )
+    setNotifications((current) =>
+      current.map((notification) => ({
+        ...notification,
+        actor: apply(notification.actor),
+      })),
+    )
+  }
+
+  async function openNotification(item: AppNotification) {
+    setNotifications((current) =>
+      current.map((notification) =>
+        notification.id === item.id && !notification.readAt
+          ? { ...notification, readAt: new Date().toISOString() }
+          : notification,
+      ),
+    )
+    if (!item.readAt) setUnreadCount((count) => Math.max(0, count - 1))
+
+    setActiveProjectId(item.projectId)
+    if (item.kind === 'message' && item.conversationId) {
+      setActiveConversationId(item.conversationId)
+      setSection('messages')
+    } else if (item.kind === 'call-invite') {
+      setSection('call')
+    } else {
+      setSection('board')
+    }
+
+    if (!item.readAt) {
+      try {
+        await notificationsApi.markRead(item.id)
+      } catch {
+        // The next refresh restores the unread state if this fails.
+      }
+    }
+  }
+
+  async function markAllNotificationsRead() {
+    setNotifications((current) =>
+      current.map((notification) =>
+        notification.readAt
+          ? notification
+          : { ...notification, readAt: new Date().toISOString() },
+      ),
+    )
+    setUnreadCount(0)
+
+    try {
+      await notificationsApi.markAllRead()
+    } catch (error) {
+      setRequestError(
+        error instanceof Error ? error.message : 'Notifications could not be updated.',
+      )
+    }
+  }
+
   function selectProject(projectId: string) {
     setActiveProjectId(projectId)
     if (section === 'home') setSection('board')
@@ -724,6 +865,7 @@ function App() {
   return (
     <div className="app-shell">
       <aside className="sidebar">
+        <div className="sidebar-bar">
         <a
           className="brand"
           href="/"
@@ -733,9 +875,16 @@ function App() {
             setSection('home')
           }}
         >
-          <span className="brand__mark">T</span>
+          <span className="brand__mark">P</span>
           Parallel
         </a>
+        <NotificationMenu
+          unreadCount={unreadCount}
+          items={notifications}
+          onSelect={(item) => void openNotification(item)}
+          onMarkAllRead={() => void markAllNotificationsRead()}
+        />
+        </div>
 
         <div className="project-switcher">
           <div className="project-toolbar">
@@ -881,7 +1030,26 @@ function App() {
 
         <div className="sidebar-footer">
           <div className="account">
-            <span className="account__email">{user.email}</span>
+            <button
+              className="account__profile"
+              type="button"
+              onClick={() => setIsProfileOpen(true)}
+            >
+              <Avatar
+                person={{
+                  displayName: profile?.displayName ?? null,
+                  email: profile?.email ?? user.email ?? '',
+                  photoUrl: profile?.photoUrl ?? null,
+                }}
+              />
+              <span>
+                <strong>{personName({
+                  displayName: profile?.displayName ?? null,
+                  email: user.email ?? '',
+                })}</strong>
+                <span className="account__email">{user.email}</span>
+              </span>
+            </button>
             <button type="button" onClick={() => void signOut(auth)}>
               Sign out
             </button>
@@ -908,6 +1076,7 @@ function App() {
               </p>
             )}
           </div>
+          <div className="page-tools">
           {(section === 'board' || section === 'messages' || section === 'activity') && (
           <div className="page-actions">
             {activeProject && !activeProject.canManage && (
@@ -948,6 +1117,7 @@ function App() {
             )}
           </div>
           )}
+          </div>
         </header>
 
         {requestError && (
@@ -1088,6 +1258,21 @@ function App() {
         </>
         )}
       </main>
+
+      {isProfileOpen && user.email && (
+        <ProfileModal
+          profile={
+            profile ?? {
+              uid: user.uid,
+              email: user.email,
+              displayName: null,
+              photoUrl: null,
+            }
+          }
+          onClose={() => setIsProfileOpen(false)}
+          onSave={saveProfile}
+        />
+      )}
 
       {commentingTask && activeProject && user && (
         <TaskCommentsModal

@@ -1,16 +1,13 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import type { Task, TaskComment } from '../types'
 import { tasksApi } from '../services/api'
+import { Avatar, personName } from './Avatar'
 
 interface TaskCommentsModalProps {
   projectId: string
   task: Task
   currentUserId: string
   onClose: () => void
-}
-
-function personName(person: { displayName: string | null; email: string }) {
-  return person.displayName || person.email
 }
 
 export function TaskCommentsModal({
@@ -121,7 +118,10 @@ export function TaskCommentsModal({
             {comments.map((comment) => (
               <li key={comment.id} className="message">
                 <div className="message__meta">
-                  <span className="message__author">{personName(comment.author)}</span>
+                  <span className="message__author">
+                    <Avatar person={comment.author} />
+                    {personName(comment.author)}
+                  </span>
                   <span className="message__actions">
                     <time dateTime={comment.createdAt}>
                       {new Date(comment.createdAt).toLocaleString()}
