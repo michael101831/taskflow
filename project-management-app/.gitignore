@@ -2,6 +2,9 @@ node_modules/
 dist/
 .env
 .env.local
+.env.*
+!.env.example
+.neon-url
 *.log
 .DS_Store
 .firebase/

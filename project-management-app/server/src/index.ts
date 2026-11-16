@@ -9,7 +9,7 @@ const port = Number(process.env.PORT) || 3001
 const server = createServer(app)
 const calls = attachCallSignaling(server)
 
-server.listen(port, () => {
+server.listen(port, '0.0.0.0', () => {
   console.log(`API listening at http://localhost:${port}`)
 })
 

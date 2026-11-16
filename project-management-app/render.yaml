@@ -11,8 +11,6 @@ services:
       - key: DATABASE_URL
         sync: false
       - key: FIREBASE_PROJECT_ID
-        sync: false
-      - key: FIREBASE_SERVICE_ACCOUNT
-        sync: false
+        value: taskflow-project-fb
       - key: CLIENT_ORIGIN
-        sync: false
+        value: https://taskflow-project-fb.web.app

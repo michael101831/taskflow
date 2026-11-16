@@ -92,7 +92,8 @@ project-management-app/
 ## Deployment
 
 The live app is at https://taskflow-project-fb.web.app. The API is at
-https://taskflow-api-production-04fe.up.railway.app, with PostgreSQL on Railway.
+https://taskflow-api-production-04fe.up.railway.app. The hosted database is a
+Neon Postgres project named parallel, in AWS us-east-1.
 
 The client is hosted on Firebase Hosting. The API is a separate Node service
 because Firebase Hosting only serves the built React app.
@@ -115,11 +116,21 @@ developer-account button stays hidden in the production build.
 
 ### API and database
 
-`render.yaml` describes a Render web service for the API. Create a hosted
-PostgreSQL database (Neon, Supabase, or Render Postgres) and set these
-environment variables on the API service:
+Projects, tasks, messages, and the rest of the account data live in a Neon
+Postgres database. Neon’s free plan is enough for this app: 1 GB of storage,
+and the database pauses after a few minutes without queries.
 
-- `DATABASE_URL` — the hosted Postgres connection string
+Create a Neon project, then copy its **direct** connection string (the host
+name without `-pooler`). Append `sslmode=require` if it is not already there.
+Put that string in `DATABASE_URL` on the API host. Keep it out of git.
+`server/.env` is only for the machine running the API.
+
+```env
+DATABASE_URL="postgresql://USER:PASSWORD@HOST/neondb?sslmode=require"
+```
+
+Set these variables on the API service as well:
+
 - `FIREBASE_PROJECT_ID` — the Firebase project id
 - `CLIENT_ORIGIN` — the Firebase Hosting origin, such as
   `https://taskflow-project-fb.web.app`
@@ -129,4 +140,4 @@ Do not set `FIREBASE_AUTH_EMULATOR_HOST` in production. A service-account file
 is not required for sign-in checks.
 
 The same API image can be built from `server/Dockerfile` on any host that
-provides those variables and a public `PORT`.
+provides those variables and a public `PORT`. `render.yaml` is one such host.
