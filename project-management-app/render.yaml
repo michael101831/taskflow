@@ -3,8 +3,8 @@ services:
     name: taskflow-api
     runtime: node
     plan: free
-    rootDir: server
-    buildCommand: npm install && npx prisma generate && npm run build
+    rootDir: project-management-app/server
+    buildCommand: npm install --include=dev --include=optional && npm install --no-save --include=optional @typescript/typescript-linux-x64@7.0.2 && npx prisma generate && npm run build
     startCommand: npm run start:prod
     healthCheckPath: /api/health
     envVars:

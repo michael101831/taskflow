@@ -92,7 +92,7 @@ project-management-app/
 ## Deployment
 
 The live app is at https://taskflow-project-fb.web.app. The API is at
-https://taskflow-api-production-04fe.up.railway.app. The hosted database is a
+https://taskflow-api-z1c9.onrender.com. The hosted database is a
 Neon Postgres project named parallel, in AWS us-east-1.
 
 The client is hosted on Firebase Hosting. The API is a separate Node service
@@ -126,7 +126,7 @@ Put that string in `DATABASE_URL` on the API host. Keep it out of git.
 `server/.env` is only for the machine running the API.
 
 ```env
-DATABASE_URL="postgresql://USER:PASSWORD@HOST/neondb?sslmode=require"
+DATABASE_URL="postgresql://USER:PASSWORD@HOST/parallel?sslmode=require"
 ```
 
 Set these variables on the API service as well:
